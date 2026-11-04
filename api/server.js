@@ -200,6 +200,13 @@ app.use((err, req, res, next) => {
 // DEMARRAGE DU SERVEUR
 // ========================================
 
-app.listen(PORT, () => {
-    console.log(`SPOT RAIL API démarrée sur le port ${PORT}`);
+const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(
+        `SPOT RAIL API démarrée sur http://0.0.0.0:${PORT}`
+    );
+});
+
+server.on("error", (error) => {
+    console.error("Erreur de démarrage SPOT RAIL :", error);
+    process.exit(1);
 });

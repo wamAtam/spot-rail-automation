@@ -27,19 +27,23 @@ jobs:
       SPOTRAIL_PRIORITY: ${{ vars.SPOTRAIL_PRIORITY }}
 
     steps:
+      # 1. Récupération du code source
       - name: Recuperer le code source
         uses: actions/checkout@v4
 
+      # 2. Installation de Node.js
       - name: Installer Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
+      # 3. Installation des dépendances
       - name: Installer les dependances
         run: npm ci
 
-      - name: Vérifier la configuration
+      # 4. Vérification de la configuration
+      - name: Verifier les variables
         run: |
           for key in PORT SPOTRAIL_TOKEN SPOTRAIL_TECHNICIAN \
             SPOTRAIL_DESCRIPTION SPOTRAIL_SPECIALITY SPOTRAIL_PRIORITY
@@ -49,20 +53,44 @@ jobs:
               exit 1
             fi
           done
+
           echo "Configuration valide"
 
+      # 5. Installation de Postman CLI
       - name: Installer Postman CLI
         run: |
           curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
 
+      # 6. Tests Node.js
       - name: Lancer les tests Node.js
         run: npm test
 
+      # 7. Démarrage de l'API Express
       - name: Demarrer API
         run: |
           npm start > server.log 2>&1 &
           echo $! > server.pid
 
+          for i in {1..10}; do
+            if grep -q "SPOT RAIL API démarrée" server.log; then
+              echo "Serveur démarré avec succès"
+              exit 0
+            fi
+
+            if ! kill -0 "$(cat server.pid)" 2>/dev/null; then
+              cat server.log
+              echo "Le serveur s'est arrêté"
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          cat server.log
+          echo "Délai de démarrage dépassé"
+          exit 1
+
+      # 8. Vérification de la disponibilité de l'API
       - name: Attendre le demarrage API
         run: |
           for i in {1..30}; do
@@ -82,9 +110,11 @@ jobs:
           echo "API non disponible"
           exit 1
 
+      # 9. Exécution des tests fonctionnels Postman
       - name: Executer les tests Postman CLI
         run: npm run test:postman
 
+      # 10. Logs en cas d'échec
       - name: Afficher les logs API en cas d'echec
         if: failure()
         run: cat server.log
