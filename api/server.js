@@ -1,12 +1,24 @@
+require("dotenv").config();
 
 const express = require("express");
-
 const app = express();
 
 app.use(express.json());
 
-// Authentification simulée
-const VALID_TOKEN = "spotrail-test-2026";
+// ========================================
+// CONFIGURATION
+// ========================================
+
+const PORT = process.env.PORT || 3000;
+const VALID_TOKEN = process.env.SPOTRAIL_TOKEN;
+
+if (!VALID_TOKEN) {
+    throw new Error("SPOTRAIL_TOKEN est obligatoire dans le fichier .env");
+}
+
+// ========================================
+// AUTHENTIFICATION
+// ========================================
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers.authorization;
@@ -28,7 +40,10 @@ function authenticateToken(req, res, next) {
     next();
 }
 
-// Stockage temporaire des interventions
+// ========================================
+// STOCKAGE EN MEMOIRE
+// ========================================
+
 let workOrders = [];
 let nextId = 1;
 
@@ -37,12 +52,15 @@ let nextId = 1;
 // ========================================
 
 app.post("/api/workorders", authenticateToken, (req, res) => {
-
     const { description, speciality, priority } = req.body || {};
 
-    if (!description || !speciality || !priority) {
+    if (
+        typeof description !== "string" || !description.trim() ||
+        typeof speciality !== "string" || !speciality.trim() ||
+        typeof priority !== "string" || !priority.trim()
+    ) {
         return res.status(400).json({
-            message: "Champs obligatoires manquants"
+            message: "Champs obligatoires manquants ou invalides"
         });
     }
 
@@ -50,10 +68,10 @@ app.post("/api/workorders", authenticateToken, (req, res) => {
 
     const workOrder = {
         id,
-        workOrder: `WO-2026-${String(id).padStart(5, "0")}`,
-        description,
-        speciality,
-        priority,
+        workOrder: `WO-${new Date().getFullYear()}-${String(id).padStart(5, "0")}`,
+        description: description.trim(),
+        speciality: speciality.trim(),
+        priority: priority.trim(),
         status: "NEW",
         technician: null,
         createdDate: new Date().toISOString(),
@@ -62,7 +80,7 @@ app.post("/api/workorders", authenticateToken, (req, res) => {
 
     workOrders.push(workOrder);
 
-    res.status(201).json(workOrder);
+    return res.status(201).json(workOrder);
 });
 
 // ========================================
@@ -70,7 +88,6 @@ app.post("/api/workorders", authenticateToken, (req, res) => {
 // ========================================
 
 app.put("/api/workorders/:id/assign", authenticateToken, (req, res) => {
-
     const order = workOrders.find(
         item => item.id === Number(req.params.id)
     );
@@ -92,23 +109,24 @@ app.put("/api/workorders/:id/assign", authenticateToken, (req, res) => {
         });
     }
 
-    order.technician = technician.trim();
-    order.status = "ASSIGNED";
-
-    if (order.history[order.history.length - 1] !== "ASSIGNED") {
-        order.history.push("ASSIGNED");
+    if (order.status !== "NEW") {
+        return res.status(409).json({
+            message: "Intervention déjà affectée ou non affectable"
+        });
     }
 
-    res.status(200).json(order);
-});
+    order.technician = technician.trim();
+    order.status = "ASSIGNED";
+    order.history.push("ASSIGNED");
 
+    return res.status(200).json(order);
+});
 
 // ========================================
 // 3. CHANGEMENT DE STATUT
 // ========================================
 
 app.put("/api/workorders/:id/status", authenticateToken, (req, res) => {
-
     const order = workOrders.find(
         item => item.id === Number(req.params.id)
     );
@@ -126,7 +144,7 @@ app.put("/api/workorders/:id/status", authenticateToken, (req, res) => {
         IN_PROGRESS: ["COMPLETED"]
     };
 
-    if (!status) {
+    if (typeof status !== "string" || !status.trim()) {
         return res.status(400).json({
             message: "Nouveau statut obligatoire"
         });
@@ -141,16 +159,14 @@ app.put("/api/workorders/:id/status", authenticateToken, (req, res) => {
     order.status = status;
     order.history.push(status);
 
-    res.status(200).json(order);
+    return res.status(200).json(order);
 });
 
-
 // ========================================
-// 3. CONSULTATION D'UNE INTERVENTION
+// 4. CONSULTATION D'UNE INTERVENTION
 // ========================================
 
-app.get("/api/workorders/:id", (req, res) => {
-
+app.get("/api/workorders/:id", authenticateToken, (req, res) => {
     const order = workOrders.find(
         item => item.id === Number(req.params.id)
     );
@@ -161,13 +177,29 @@ app.get("/api/workorders/:id", (req, res) => {
         });
     }
 
-    res.status(200).json(order);
+    return res.status(200).json(order);
 });
 
 // ========================================
-// 4. DEMARRAGE DU SERVEUR
+// GESTION DES ERREURS JSON
 // ========================================
 
-app.listen(3000, () => {
-    console.log("SPOT RAIL API démarrée sur http://localhost:3000");
+app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+        return res.status(400).json({
+            message: "Format JSON invalide"
+        });
+    }
+
+    return res.status(500).json({
+        message: "Erreur interne du serveur"
+    });
+});
+
+// ========================================
+// DEMARRAGE DU SERVEUR
+// ========================================
+
+app.listen(PORT, () => {
+    console.log(`SPOT RAIL API démarrée sur le port ${PORT}`);
 });

@@ -1,0 +1,314 @@
+{
+  "info": {
+    "_postman_id": "9826db30-b42c-4edf-94eb-e416b111ccfb",
+    "name": "SPOT RAIL - Tests API Copy",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "19920645"
+  },
+  "item": [
+    {
+      "name": "Creation",
+      "item": [
+        {
+          "name": "POST - Création intervention - 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const createdOrder = pm.response.json();\r\n\r\npm.test(\"Création réussie - HTTP 201\", function () {\r\n    pm.response.to.have.status(201);\r\n});\r\n\r\npm.test(\"Description correcte\", function () {\r\n    pm.expect(createdOrder.description)\r\n        .to.eql(pm.environment.get(\"description\"));\r\n});\r\n\r\npm.test(\"Speciality correcte\", function () {\r\n    pm.expect(createdOrder.speciality)\r\n        .to.eql(pm.environment.get(\"speciality\"));\r\n});\r\n\r\npm.test(\"Priority correcte\", function () {\r\n    pm.expect(createdOrder.priority)\r\n        .to.eql(pm.environment.get(\"priority\"));\r\n});\r\n\r\npm.test(\"Identifiant correctement généré\", function () {\r\n    pm.expect(createdOrder.id).to.exist;\r\n});\r\n\r\npm.environment.set(\"workOrderId\", createdOrder.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{SPOTRAIL_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"description\": \"{{description}}\",\r\n    \"speciality\": \"{{speciality}}\",\r\n    \"priority\": \"{{priority}}\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/workorders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "workorders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT - affecatation -technicien",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "\r\npm.test(\"Affectation - HTTP 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\nconst assignedOrder = pm.response.json();\r\nconst requestData = JSON.parse(pm.request.body.raw);\r\n\r\npm.test(\"Technicien correctement affecté\", function () {\r\n    pm.expect(assignedOrder.technician)\r\n        .to.eql(requestData.technician.trim());\r\n});\r\n\r\npm.test(\"Statut ASSIGNED\", function () {\r\n    pm.expect(assignedOrder.status).to.eql(\"ASSIGNED\");\r\n});\r\n\r\npm.test(\"Historique correctement mis à jour\", function () {\r\n    pm.expect(assignedOrder.history)\r\n        .to.include(\"NEW\");\r\n    pm.expect(assignedOrder.history)\r\n        .to.include(assignedOrder.status);\r\n});\r\n"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{SPOTRAIL_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"technician\": \"{{nom_technicien}}\"\r\n}\r\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/workorders/{{workOrderId}}/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "workorders",
+                "{{workOrderId}}",
+                "assign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT – Status IN_PROGRESS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "\r\nconst updatedOrder = pm.response.json();\r\nconst requestData = JSON.parse(pm.request.body.raw);\r\n\r\npm.test(\"Démarrage réussi - HTTP 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Statut correctement modifié\", function () {\r\n    pm.expect(updatedOrder.status).to.eql(requestData.status);\r\n});\r\n\r\npm.test(\"Technicien conservé\", function () {\r\n    pm.expect(updatedOrder.technician).to.be.a(\"string\").and.not.empty;\r\n});\r\n\r\npm.test(\"Historique mis à jour\", function () {\r\n    pm.expect(updatedOrder.history)\r\n        .to.include(requestData.status);\r\n});\r\n"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{SPOTRAIL_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"status\": \"IN_PROGRESS\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/workorders/{{workOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "workorders",
+                "{{workOrderId}}",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT – Status COMPLETED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "\r\nconst completedOrder = pm.response.json();\r\nconst requestData = JSON.parse(pm.request.body.raw);\r\n\r\npm.test(\"Clôture réussie - HTTP 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Statut correctement modifié\", function () {\r\n    pm.expect(completedOrder.status).to.eql(requestData.status);\r\n});\r\n\r\npm.test(\"Technicien conservé\", function () {\r\n    pm.expect(completedOrder.technician).to.be.a(\"string\").and.not.empty;\r\n});\r\n\r\npm.test(\"Historique complet\", function () {\r\n    pm.expect(completedOrder.history)\r\n        .to.include(\"NEW\")\r\n        .and.to.include(\"ASSIGNED\")\r\n        .and.to.include(\"IN_PROGRESS\")\r\n        .and.to.include(requestData.status);\r\n});\r\n"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{SPOTRAIL_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"status\": \"COMPLETED\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/workorders/{{workOrderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "workorders",
+                "{{workOrderId}}",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Intervention existante - 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "\r\npm.test(\"Consultation réussie - HTTP 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\nconst consultedOrder = pm.response.json();\r\n\r\npm.test(\"Identifiant correct\", function () {\r\n    pm.expect(consultedOrder.id).to.eql(\r\n        Number(pm.environment.get(\"workOrderId\"))\r\n    );\r\n});\r\n\r\npm.test(\"Technicien correctement affecté\", function () {\r\n    pm.expect(consultedOrder.technician)\r\n        .to.be.a(\"string\")\r\n        .and.not.empty;\r\n});\r\n\r\npm.test(\"Statut final correctement enregistré\", function () {\r\n    pm.expect(consultedOrder.status).to.eql(\"COMPLETED\");\r\n});\r\n\r\npm.test(\"Historique complet\", function () {\r\n    pm.expect(consultedOrder.history).to.eql([\r\n        \"NEW\",\r\n        \"ASSIGNED\",\r\n        \"IN_PROGRESS\",\r\n        \"COMPLETED\"\r\n    ]);\r\n});\r\n"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{SPOTRAIL_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/workorders/{{workOrderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "workorders",
+                "{{workOrderId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "interdite",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Transition interdite - HTTP 409\", function () {\r\n    pm.response.to.have.status(409);\r\n});\r\n\r\nconst errorData = pm.response.json();\r\n\r\npm.test(\"Message d'erreur présent\", function () {\r\n    pm.expect(errorData.message).to.include(\"Transition impossible\");\r\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{SPOTRAIL_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"status\": \"ASSIGNED\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/workorders/1/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "workorders",
+                "1",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "workOrderId",
+      "value": ""
+    }
+  ]
+}
