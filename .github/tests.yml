@@ -42,7 +42,7 @@ jobs:
       - name: Installer les dependances
         run: npm ci
 
-      # 4. Vérification de la configuration
+      # 4. Vérification des variables
       - name: Verifier les variables
         run: |
           for key in PORT SPOTRAIL_TOKEN SPOTRAIL_TECHNICIAN \
@@ -74,6 +74,7 @@ jobs:
           for i in {1..10}; do
             if grep -q "SPOT RAIL API démarrée" server.log; then
               echo "Serveur démarré avec succès"
+              cat server.log
               exit 0
             fi
 
@@ -93,20 +94,48 @@ jobs:
       # 8. Vérification de la disponibilité de l'API
       - name: Attendre le demarrage API
         run: |
-          for i in {1..30}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              -H "Authorization: Bearer ${SPOTRAIL_TOKEN}" \
-              "http://localhost:${PORT}/api/workorders/999999")
+          echo "Vérification de SPOT RAIL API..."
 
-            if [ "$STATUS" = "404" ]; then
-              echo "API disponible"
-              exit 0
+          for i in {1..30}; do
+
+            if curl -sS \
+              --connect-timeout 2 \
+              --max-time 5 \
+              -o response.txt \
+              -w "%{http_code}" \
+              -H "Authorization: Bearer ${SPOTRAIL_TOKEN}" \
+              "http://127.0.0.1:${PORT}/api/workorders/999999" \
+              > status.txt; then
+
+              STATUS=$(cat status.txt)
+
+              echo "Tentative $i : HTTP $STATUS"
+
+              if [ "$STATUS" = "404" ]; then
+                echo "API disponible et authentification valide"
+                cat response.txt
+                exit 0
+              fi
+
+              echo "Réponse API :"
+              cat response.txt
+
+            else
+              echo "Tentative $i : connexion impossible"
             fi
 
             sleep 2
           done
 
+          echo "===== LOGS SERVEUR ====="
           cat server.log
+
+          echo "===== DERNIERE REPONSE HTTP ====="
+          cat response.txt 2>/dev/null || true
+
+          echo "===== DERNIER CODE HTTP ====="
+          cat status.txt 2>/dev/null || true
+
           echo "API non disponible"
           exit 1
 
@@ -117,4 +146,6 @@ jobs:
       # 10. Logs en cas d'échec
       - name: Afficher les logs API en cas d'echec
         if: failure()
-        run: cat server.log
+        run: |
+          echo "===== LOGS API ====="
+          cat server.log
