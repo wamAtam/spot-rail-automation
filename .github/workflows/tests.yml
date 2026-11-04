@@ -27,19 +27,23 @@ jobs:
       SPOTRAIL_PRIORITY: ${{ vars.SPOTRAIL_PRIORITY }}
 
     steps:
+      # 1. Récupération du code source
       - name: Recuperer le code source
         uses: actions/checkout@v4
 
+      # 2. Installation de Node.js
       - name: Installer Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
+      # 3. Installation des dépendances
       - name: Installer les dependances
         run: npm ci
 
-      - name: Vérifier la configuration
+      # 4. Vérification des variables
+      - name: Verifier les variables
         run: |
           for key in PORT SPOTRAIL_TOKEN SPOTRAIL_TECHNICIAN \
             SPOTRAIL_DESCRIPTION SPOTRAIL_SPECIALITY SPOTRAIL_PRIORITY
@@ -49,42 +53,99 @@ jobs:
               exit 1
             fi
           done
+
           echo "Configuration valide"
 
+      # 5. Installation de Postman CLI
       - name: Installer Postman CLI
         run: |
           curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
 
+      # 6. Tests Node.js
       - name: Lancer les tests Node.js
         run: npm test
 
+      # 7. Démarrage de l'API Express
       - name: Demarrer API
         run: |
           npm start > server.log 2>&1 &
           echo $! > server.pid
 
+          for i in {1..10}; do
+            if grep -q "SPOT RAIL API démarrée" server.log; then
+              echo "Serveur démarré avec succès"
+              cat server.log
+              exit 0
+            fi
+
+            if ! kill -0 "$(cat server.pid)" 2>/dev/null; then
+              cat server.log
+              echo "Le serveur s'est arrêté"
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          cat server.log
+          echo "Délai de démarrage dépassé"
+          exit 1
+
+      # 8. Vérification de la disponibilité de l'API
       - name: Attendre le demarrage API
         run: |
-          for i in {1..30}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              -H "Authorization: Bearer ${SPOTRAIL_TOKEN}" \
-              "http://localhost:${PORT}/api/workorders/999999")
+          echo "Vérification de SPOT RAIL API..."
 
-            if [ "$STATUS" = "404" ]; then
-              echo "API disponible"
-              exit 0
+          for i in {1..30}; do
+
+            if curl -sS \
+              --connect-timeout 2 \
+              --max-time 5 \
+              -o response.txt \
+              -w "%{http_code}" \
+              -H "Authorization: Bearer ${SPOTRAIL_TOKEN}" \
+              "http://127.0.0.1:${PORT}/api/workorders/999999" \
+              > status.txt; then
+
+              STATUS=$(cat status.txt)
+
+              echo "Tentative $i : HTTP $STATUS"
+
+              if [ "$STATUS" = "404" ]; then
+                echo "API disponible et authentification valide"
+                cat response.txt
+                exit 0
+              fi
+
+              echo "Réponse API :"
+              cat response.txt
+
+            else
+              echo "Tentative $i : connexion impossible"
             fi
 
             sleep 2
           done
 
+          echo "===== LOGS SERVEUR ====="
           cat server.log
+
+          echo "===== DERNIERE REPONSE HTTP ====="
+          cat response.txt 2>/dev/null || true
+
+          echo "===== DERNIER CODE HTTP ====="
+          cat status.txt 2>/dev/null || true
+
           echo "API non disponible"
           exit 1
 
+      # 9. Exécution des tests fonctionnels Postman
       - name: Executer les tests Postman CLI
         run: npm run test:postman
 
+      # 10. Logs en cas d'échec
       - name: Afficher les logs API en cas d'echec
         if: failure()
-        run: cat server.log
+        run: |
+          echo "===== LOGS API ====="
+          cat server.log
